@@ -2,9 +2,9 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
-import { signUp, login } from '../lib/api';
-import { setToken } from '../lib/auth';
+import { useEffect, useState } from 'react';
+import { login, signUp } from '../lib/api';
+import { isLoggedIn, setToken } from '../lib/auth';
 
 export default function SignupPage() {
   const router = useRouter();
@@ -17,6 +17,10 @@ export default function SignupPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
+  useEffect(() => {
+    if (isLoggedIn()) router.replace('/recommend');
+  }, [router]);
+
   function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
     setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
   }
@@ -25,13 +29,22 @@ export default function SignupPage() {
     e.preventDefault();
     setError('');
     setLoading(true);
+
     try {
-      await signUp(form);
-      const token = await login(form.email, form.password);
-      setToken(token);
-      router.push('/recommend');
+      await signUp({ ...form, name: form.name.trim(), email: form.email.trim() });
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : '회원가입에 실패했습니다.');
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const token = await login(form.email.trim(), form.password);
+      setToken(token);
+      router.push('/recommend');
+    } catch {
+      // 회원가입은 성공했으나 자동 로그인 실패 → 로그인 페이지로
+      router.push('/login');
     } finally {
       setLoading(false);
     }

@@ -5,18 +5,9 @@ import { useEffect, useRef, useState } from 'react';
 import FeatureBadge from '../components/FeatureBadge';
 import MenuCard from '../components/MenuCard';
 import { Menu, ParsedFeature, recommend, selectMenu } from '../lib/api';
-import { getToken, isLoggedIn } from '../lib/auth';
+import { getToken, getUserIdFromToken, isLoggedIn } from '../lib/auth';
 
 type Step = 'input' | 'loading' | 'result' | 'confirmed';
-
-function getUserIdFromToken(token: string): string {
-  try {
-    const payload = JSON.parse(atob(token.split('.')[1]));
-    return payload.user_id as string;
-  } catch {
-    return '';
-  }
-}
 
 export default function RecommendPage() {
   const router = useRouter();
@@ -27,10 +18,15 @@ export default function RecommendPage() {
   const [selectedMenu, setSelectedMenu] = useState<Menu | null>(null);
   const [error, setError] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const abortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
     if (!isLoggedIn()) router.replace('/login');
   }, [router]);
+
+  useEffect(() => {
+    return () => { abortRef.current?.abort(); };
+  }, []);
 
   useEffect(() => {
     if (step === 'input') textareaRef.current?.focus();
@@ -39,19 +35,34 @@ export default function RecommendPage() {
   async function handleRecommend(e: React.FormEvent) {
     e.preventDefault();
     if (!text.trim()) return;
+
+    const token = getToken();
+    if (!token) { router.replace('/login'); return; }
+    const userId = getUserIdFromToken(token);
+    if (!userId) { router.replace('/login'); return; }
+
     setError('');
     setStep('loading');
 
-    const token = getToken()!;
-    const userId = getUserIdFromToken(token);
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
 
     try {
-      const res = await recommend(token, userId, text);
+      const res = await recommend(token, userId, text, controller.signal);
+
+      if (res.recommended_menus.length === 0) {
+        setError('추천할 메뉴를 찾지 못했습니다. 다른 표현으로 다시 시도해보세요.');
+        setStep('input');
+        return;
+      }
+
       setParsedFeatures(res.parsed_features);
       setMenus(res.recommended_menus);
       setSelectedMenu(null);
       setStep('result');
     } catch (err: unknown) {
+      if ((err as Error)?.name === 'AbortError') return;
       setError(err instanceof Error ? err.message : '추천 중 오류가 발생했습니다.');
       setStep('input');
     }
@@ -61,8 +72,10 @@ export default function RecommendPage() {
     setSelectedMenu(menu);
     setStep('confirmed');
 
-    const token = getToken()!;
+    const token = getToken();
+    if (!token) return;
     const userId = getUserIdFromToken(token);
+    if (!userId) return;
 
     try {
       await selectMenu(token, {
@@ -77,6 +90,7 @@ export default function RecommendPage() {
   }
 
   function handleReset() {
+    abortRef.current?.abort();
     setText('');
     setParsedFeatures([]);
     setMenus([]);
@@ -103,7 +117,9 @@ export default function RecommendPage() {
           onKeyDown={(e) => {
             if (e.key === 'Enter' && !e.shiftKey) {
               e.preventDefault();
-              if (step !== 'loading' && text.trim()) handleRecommend(e as unknown as React.FormEvent);
+              if (step !== 'loading' && step !== 'confirmed' && text.trim()) {
+                handleRecommend(e as unknown as React.FormEvent);
+              }
             }
           }}
           disabled={step === 'loading' || step === 'confirmed'}

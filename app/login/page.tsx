@@ -2,9 +2,9 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { login } from '../lib/api';
-import { setToken } from '../lib/auth';
+import { isLoggedIn, setToken } from '../lib/auth';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -13,12 +13,16 @@ export default function LoginPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
+  useEffect(() => {
+    if (isLoggedIn()) router.replace('/recommend');
+  }, [router]);
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError('');
     setLoading(true);
     try {
-      const token = await login(email, password);
+      const token = await login(email.trim(), password);
       setToken(token);
       router.push('/recommend');
     } catch (err: unknown) {

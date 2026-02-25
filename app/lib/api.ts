@@ -1,3 +1,5 @@
+import { removeToken } from './auth';
+
 const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:8000';
 
 async function request<T>(
@@ -14,6 +16,12 @@ async function request<T>(
     ...init,
     headers,
   });
+
+  if (res.status === 401) {
+    removeToken();
+    if (typeof window !== 'undefined') window.location.replace('/login');
+    throw new Error('인증이 만료되었습니다. 다시 로그인해주세요.');
+  }
 
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: res.statusText }));
@@ -60,11 +68,13 @@ export interface RecommendResponse {
 export async function recommend(
   token: string,
   user_id: string,
-  text: string
+  text: string,
+  signal?: AbortSignal
 ): Promise<RecommendResponse> {
   return request<RecommendResponse>('/recommend/v1/', {
     method: 'POST',
     token,
+    signal,
     body: JSON.stringify({ user_id, text }),
   });
 }

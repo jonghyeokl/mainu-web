@@ -13,6 +13,27 @@ export function removeToken(): void {
   localStorage.removeItem(TOKEN_KEY);
 }
 
+export function getUserIdFromToken(token: string): string {
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    return (payload.user_id as string) ?? '';
+  } catch {
+    return '';
+  }
+}
+
 export function isLoggedIn(): boolean {
-  return !!getToken();
+  const token = getToken();
+  if (!token) return false;
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    if (payload.exp && payload.exp * 1000 < Date.now()) {
+      removeToken();
+      return false;
+    }
+    return true;
+  } catch {
+    removeToken();
+    return false;
+  }
 }
