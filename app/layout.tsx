@@ -4,7 +4,7 @@ import Link from 'next/link';
 
 export const metadata = {
   title: 'Project mainu',
-  description: 'AI 다이어리 서비스',
+  description: 'AI 메뉴 추천 서비스',
 };
 
 export default function RootLayout({
