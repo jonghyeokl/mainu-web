@@ -31,11 +31,11 @@ export async function signUp(body: {
   password: string;
   phone_number: string;
 }): Promise<void> {
-  await request('/user/', { method: 'POST', body: JSON.stringify(body) });
+  await request('/user/v1/', { method: 'POST', body: JSON.stringify(body) });
 }
 
 export async function login(email: string, password: string): Promise<string> {
-  return request<string>('/user/login', {
+  return request<string>('/user/v1/login', {
     method: 'POST',
     body: JSON.stringify({ email, password }),
   });
@@ -62,7 +62,7 @@ export async function recommend(
   user_id: string,
   text: string
 ): Promise<RecommendResponse> {
-  return request<RecommendResponse>('/recommend/', {
+  return request<RecommendResponse>('/recommend/v1/', {
     method: 'POST',
     token,
     body: JSON.stringify({ user_id, text }),
@@ -89,7 +89,7 @@ export async function selectMenu(
     parsed_features: ParsedFeature[];
   }
 ): Promise<ChoiceResponse> {
-  return request<ChoiceResponse>('/select/', {
+  return request<ChoiceResponse>('/select/v1/', {
     method: 'POST',
     token,
     body: JSON.stringify(body),
